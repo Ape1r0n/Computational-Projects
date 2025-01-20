@@ -1,0 +1,812 @@
+\documentclass{article}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{enumerate}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{marvosym}
+\usepackage{pifont}
+\usepackage{pythonhighlight}
+\usepackage{subcaption}
+\usepackage{stmaryrd}
+\usepackage{xcolor}
+\usepackage{pythonhighlight}
+
+
+\definecolor{c1}{HTML}{C42D2D}
+\definecolor{c2}{HTML}{D1D1D1}
+\definecolor{c3}{HTML}{3B9C38}
+\definecolor{c4}{HTML}{1C5C3D}
+
+\lstdefinestyle{xmas}{
+	backgroundcolor=\color{white},   
+	commentstyle=\color{c3},
+	keywordstyle=\color{c1},
+	numberstyle=\tiny\color{c3},
+	stringstyle=\color{c3},
+	basicstyle=\ttfamily\footnotesize,
+	breakatwhitespace=false,         
+	breaklines=true,                 
+	captionpos=b,                    
+	keepspaces=true,                 
+	numbers=left,                    
+	numbersep=5pt,                  
+	showspaces=false,                
+	showstringspaces=false,
+	showtabs=false,                  
+	tabsize=4
+}
+
+\lstset{style=xmas}
+
+
+\begin{document}	
+	
+	\title{\textbf{Numerical Programming} \\ \textit{Hit a Ball to a Fixed Target}}
+	\author{Lado \Bat \space Turmanidze}
+	\date{\today}
+
+	\maketitle
+	
+	
+	\section*{Problem Statement}
+	
+	\subsection*{Hit a ball to a fixed target \Circpipe}
+		
+		\begin{itemize}
+			\item[\ding{101}] Input: Image of randomly scattered balls.
+			\item[\ding{101}] Task: Throw ball and hit balls on the image one after another.
+			\item[\ding{101}] Output: Animation corresponding to the task description.
+			\item[\ding{101}] Test: Test case description.
+			\item[\ding{101}] Methodology: Should contain problem formulation, including equation with initial and boundary condition, method of solution, algorithm.
+		\end{itemize}	
+	
+	\subsection*{Tasks}
+		
+		\begin{itemize}
+			\item[\ding{100}] Formulate the algorithm and explain your approach in written form.
+			\item[\ding{100}] Describe the properties of numerical methods in written form.
+			\item[\ding{100}] Develop test cases and demonstrate the validity of your results.
+			\item[\ding{100}] Upload all necessary files, including: 
+			\begin{enumerate} 
+				\item Presentation file 
+				\item Code 
+				\item Test data and their description 
+			\end{enumerate}
+			\item[\ding{100}] Using the shooting method and the ball motion equation is compulsory.
+		\end{itemize}
+
+	\textbf{Note}: 
+	
+	The code uses \textit{pyray} for visualization, but if you open up IDE of your choice and let it install this library(in case you have not done it yet), it will probably install a wrong version. For the correct version, you have to install \textit{raylib}, either with \textit{pip3} or, in case of PyCharm, with \textbf{Python Packages} window.
+	
+	\newpage
+	\section{Hit a ball to a fixed target \CircPipe}
+	
+	For purposes of this project, non-max suppression, double thresholding and hysteresis is overkill, so edge detection will simply be reduced to simple Sobel operator convolution. The indexing in \textit{grad$\_$x} and \textit{grad$\_$y} might seem weird at first, but I believe it to be a clever way to apply the Sobel kernels to the image. The Sobel kernels are $3 \times 3$ matrices that are convolved with the image to calculate the gradient.
+	\begin{itemize}
+		\item[\textit{grad$\_$x[1:-1, 1:-1]}:] This is selecting a sub-array of \textit{grad$\_$x} that starts from the second row and column (index $1$) and goes up to the second last row and column (index $-1$). This is done to avoid the edges of the image, where the Sobel kernel would extend beyond the image boundaries.
+		\item[\textit{img[:-2, :-2]}... :] These are selecting sub-arrays of \textit{img} that are shifted by one or two rows/columns relative to the current position. This is done to apply the Sobel kernel to the image.
+	\end{itemize}	
+		
+	\begin{lstlisting}[language=Python]
+def get_edge_points(img):
+	# Sobel kernels for x and y matrices
+	sobel_x = np.array([[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]])
+	sobel_y = np.array([[-1, -2, -1], [0,  0,  0], [1,  2,  1]])
+	
+	grad_x = np.zeros_like(img, dtype=float)
+	grad_y = np.zeros_like(img, dtype=float)
+	
+	grad_x[1:-1, 1:-1] = (
+		sobel_x[0, 0] * img[:-2, :-2] + sobel_x[0, 1] * img[:-2, 1:-1] + sobel_x[0, 2] * img[:-2, 2:] +
+		sobel_x[1, 0] * img[1:-1, :-2] + sobel_x[1, 1] * img[1:-1, 1:-1] + sobel_x[1, 2] * img[1:-1, 2:] +
+		sobel_x[2, 0] * img[2:, :-2] + sobel_x[2, 1] * img[2:, 1:-1] + sobel_x[2, 2] * img[2:, 2:]
+	)
+	
+	grad_y[1:-1, 1:-1] = (
+		sobel_y[0, 0] * img[:-2, :-2] + sobel_y[0, 1] * img[:-2, 1:-1] + sobel_y[0, 2] * img[:-2, 2:] +
+		sobel_y[1, 0] * img[1:-1, :-2] + sobel_y[1, 1] * img[1:-1, 1:-1] + sobel_y[1, 2] * img[1:-1, 2:] +
+		sobel_y[2, 0] * img[2:, :-2] + sobel_y[2, 1] * img[2:, 1:-1] + sobel_y[2, 2] * img[2:, 2:]
+	)
+	
+	grad_magnitude = np.sqrt(grad_x**2 + grad_y**2)
+	strong_edges = grad_magnitude > 100.0  # 100 is simply a threshold for strong edges
+	edge_points = np.column_stack(np.where(strong_edges))
+	
+	return edge_points\end{lstlisting}
+
+	\begin{figure}[H]
+		\centering
+		\begin{minipage}{0.3\textwidth}
+			\centering
+			\includegraphics[width=\textwidth, height=0.17\textheight]{"Image 1.png"}
+		\end{minipage}%
+		\hspace{0.05\textwidth}
+		\begin{minipage}{0.25\textwidth}
+			\centering
+			\includegraphics[width=\textwidth, height=0.17\textheight]{"Image 2.jpeg"}
+		\end{minipage}%
+		\hspace{0.05\textwidth} 
+		\begin{minipage}{0.25\textwidth}
+			\centering
+			\includegraphics[width=\textwidth, height=0.17\textheight]{"Image 3.jpg"}
+		\end{minipage}
+		\caption{Original Images}
+	\end{figure}
+
+	The method above only does grayscaling and edge detection, but you can see how good it is for different kinds of images below:
+
+	\begin{figure}[H]
+		\centering
+		\begin{minipage}{0.3\textwidth}
+			\centering
+			\includegraphics[width=\textwidth, height=0.15\textheight]{"Image 1_ed.png"}
+		\end{minipage}%
+		\hspace{0.05\textwidth}
+		\begin{minipage}{0.25\textwidth}
+			\centering
+			\includegraphics[width=\textwidth, height=0.15\textheight]{"Image 2_ed.png"}
+		\end{minipage}%
+		\hspace{0.05\textwidth} 
+		\begin{minipage}{0.25\textwidth}
+			\centering
+			\includegraphics[width=\textwidth, height=0.15\textheight]{"Image 3_ed.png"}
+		\end{minipage}
+		\caption{Images After Edge Detection(and Grayscaling)}
+	\end{figure}
+	
+	I will continue demonstrating progress using the image in the middle, as it has proven to be the fastest for testing purposes:
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.4\textwidth]{"ed_runtime.png"}
+	\end{figure}
+	
+	As I am not expecting a specific number of balls in the image, I have decided to use DBSCAN for clustering instead of $K$-Means/$K$-Medoids. However, to enhance the efficiency of searching for neighboring points, I have made two key modifications: I utilize a Grid data structure and the Disjoint Set Union (DSU).
+	
+	\subsection*{Grid Data Structure}
+	
+	\textit{Grid} class is used to efficiently locate neighboring points. Instead of comparing every point with every other point (which would be the case for naive implementation of DBSCAN), I divide the space into grid cells. Each point is mapped to a specific grid cell based on its coordinates. When searching for neighbors, one only needs to consider points in the same cell as the target point, as well as in the neighboring cells.
+	
+	\begin{lstlisting}[language=python]
+class Grid:
+	def __init__(self, cell_size):
+		self.cell_size = cell_size
+		self.grid = defaultdict(list)
+	
+	def get_cell_coords(self, point):
+		return tuple((point // self.cell_size).astype(int))
+	
+	def insert(self, idx, point):
+		cell_coords = self.get_cell_coords(point)
+		self.grid[cell_coords].append(idx)
+	
+	def get_neighbors(self, point):
+		cell_coords = self.get_cell_coords(point)
+		neighbors = []
+		for dx in (-1, 0, 1):
+			for dy in (-1, 0, 1):
+				neighbor_coords = (cell_coords[0] + dx, cell_coords[1] + dy)
+				neighbors.extend(self.grid[neighbor_coords])
+		return neighbors
+		
+		
+class DSU:
+	def __init__(self, size):
+		self.parent = np.arange(size)
+		self.rank = np.zeros(size, dtype=int)
+	
+	def find(self, x):
+		if self.parent[x] != x:
+			self.parent[x] = self.find(self.parent[x])  # Path compression
+		return self.parent[x]
+	
+	def union(self, x, y):
+		root_x = self.find(x)
+		root_y = self.find(y)
+		if root_x != root_y:
+			if self.rank[root_x] > self.rank[root_y]:
+				self.parent[root_y] = root_x
+			elif self.rank[root_x] < self.rank[root_y]:
+				self.parent[root_x] = root_y
+			else:
+				self.parent[root_y] = root_x
+				self.rank[root_x] += 1\end{lstlisting}
+	
+	\subsection*{Disjoint Set Union(DSU)}
+	
+	\textit{DSU} class is used to group points that belong to the same cluster. The DSU data structure helps manage the merging of clusters in an efficient way by keeping track of the connected components. It supports two key operations:
+	
+	\begin{itemize}
+		\item[\ding{43}] \textbf{find}: This operation determines the "root" or representative of the set that a point belongs to. It uses path compression to speed up future queries.	
+	
+		\item[\ding{44}] \textbf{union}: This operation merges two sets (clusters) if they are connected, using union by rank to maintain a balanced tree structure.
+	\end{itemize}
+
+	In the DBSCAN algorithm, as points are found within the specified epsilon distance (\textit{eps}) from each other, I use the union operation to merge their sets (effectively assigning them to the same cluster). By doing so, points that are close enough to each other are grouped into the same cluster. \\
+	
+	In short, \textit{Grid} helps reduce the number of unnecessary comparisons, while the \textit{DSU} ensures that clusters are formed quickly and efficiently. \\
+	
+	Prior to moving on with \textit{DBSCAN}, let's quickly define second vector norm, the most intuitive one as a measure of distance:
+	
+	\begin{lstlisting}[language=python]
+def norm2(a: np.array, b: np.array) -> float:
+	return np.sqrt(np.sum((a - b) ** 2))\end{lstlisting}
+
+	And because code for the \textit{DBSCAN} is large, I will first demonstrate result of the \textit{DBSCAN.dbscan(self, X)} and will then proceed with the entire class:
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=\textwidth]{"DBSCAN_circle_detection.png"}
+	\end{figure}
+	
+	As one can see in the left figure, \textit{DBSCAN(eps=$3$, min$\_$pts=$10$)} perfectly identified all 10 different clusters and gave each of them a unique color. Code is written such that it will try to color each cluster in different color, but obviously, this might bee hard to see if there are many clusters. 
+	
+	In the figure on the right, I draw circles based on the radii and centers of the respective clusters, as the array of radii and centers are saved in \textit{dbscan.cluster$\_$radii$\_$} and \textit{dbscan.cluster$\_$radii$\_$} after \textit{DBSCAN.dbscan(self, X)}. 
+	
+	\newpage
+	\subsection*{DBSCAN with Grid and DSU}
+	
+	\begin{lstlisting}[language=python]
+class DBSCAN:
+	# I think the constructor is pretty self explanatory
+	def __init__(self, eps, min_pts, norm=norm2):
+		self.eps = eps
+		self.min_pts = min_pts
+		self.norm = norm
+		self.labels_ = None
+		self.cluster_centers_ = None
+		self.cluster_radii_ = None
+	
+	def dbscan(self, X):
+		n_samples = X.shape[0]
+		dsu = DSU(n_samples)
+		grid = Grid(cell_size=np.ceil(self.eps))
+		
+		# Inserting points in the grid
+		for idx, point in enumerate(X):
+			grid.insert(idx, point)
+		
+		# Perform clustering using the grid
+		for idx, point in enumerate(X):
+			neighbors = grid.get_neighbors(point)
+			for neighbor_idx in neighbors:
+				if neighbor_idx != idx and self.norm(X[idx], X[neighbor_idx]) <= self.eps:
+					dsu.union(idx, neighbor_idx)
+		
+		# Assign cluster IDs based on connected components
+		root_to_cluster = {}
+		cluster_id = 0
+		self.labels_ = np.full(n_samples, -2, dtype=int)  # -2 represents noise points
+		
+		for i in range(n_samples):
+			root = dsu.find(i)
+			if root not in root_to_cluster:
+				root_to_cluster[root] = cluster_id
+				cluster_id += 1
+			self.labels_[i] = root_to_cluster[root]
+		
+		# Calculate cluster centers and radii
+		centers = []
+		radii = []
+		for c_id in set(self.labels_):
+			if c_id >= 0:  # Ignore noise
+			cluster_points = X[self.labels_ == c_id]
+			if len(cluster_points) >= self.min_pts:
+				center = np.mean(cluster_points, axis=0)
+				radius = np.max([self.norm(point, center) for point in cluster_points])
+				centers.append(center)
+				radii.append(radius)
+			
+		filtered_centers = []
+		filtered_radii = []
+		for i, (center, radius) in enumerate(zip(centers, radii)):
+			keep = True
+			for j, (other_center, other_radius) in enumerate(zip(centers, radii)):
+				if i != j and self.norm(center, other_center) < radius + other_radius:
+					if radius <= other_radius:
+						keep = False
+						break
+			if keep:
+				filtered_centers.append(center)
+				filtered_radii.append(radius)
+		
+		self.cluster_centers_ = np.array(filtered_centers)
+		self.cluster_radii_ = np.array(filtered_radii)
+		
+		return self\end{lstlisting}
+	
+	The \textit{dbscan} method begins by initializing \textit{DSU} to manage clusters and a \textit{Grid} for efficient spatial indexing of points. Each point` is inserted into the grid based on its cell coordinates, which are computed using the grid's cell size set to \textit{ceil(eps)}. After constructing the grid, the method processes each point to retrieve its neighbors using the grid. For every neighboring point that lies within a distance \textit{eps}, the method merges the two points into the same cluster using \textit{DSU.union(self, x, y)}.
+	
+	Once all points are processed, the method identifies clusters by examining the connected components in \textit{DSU}. Each unique component is assigned a cluster ID, while points that do not belong to any cluster are labeled as noise a.k.a. $-2$. After assigning cluster IDs, the method computes the centers and radii for each valid cluster. For clusters containing at least \textit{min$\_$pts} points, the center is calculated as the mean of all points in the cluster, and the radius is determined as the maximum distance from the center to any point in the cluster.
+	
+	The final step (part of the code on this page) filters out intersecting circles based on their radii. It iterates over each circle represented by its center and radius. For each circle, it is compared with every other circle to check if they intersect. Two circles intersect if the distance between their centers is less than the sum of their radii. If an intersection is found, the circle with the smaller radius is marked for removal. This is achieved by setting a \textit{keep} flag to \textit{False} and breaking out of the inner loop. After all comparisons, only circles that are not marked for removal are added to the \textit{filtered$\_$centers} and \textit{filtered$\_$radii} lists. These filtered results are then assigned to the class attributes \textit{self.cluster$\_$centers$\_$} and \textit{self.cluster$\_$radii$\_$}.
+	
+	Finally, the method stores the cluster labels, centers, and radii as class attributes: \textit{labels$\_$}, \textit{cluster$\_$centers$\_$}, and \textit{cluster$\_$radii$\_$}, respectively, and returns the results.
+	
+	\subsection*{Why is there a need for circle filtering?}
+	
+	\begin{figure}[H]
+		\centering
+		\begin{minipage}{0.25\textwidth}
+			\centering
+			\includegraphics[width=\textwidth]{"Dragon Balls.png"}
+			\caption{Original}
+		\end{minipage}
+		\hspace{0.05\textwidth}
+		\begin{minipage}{0.65\textwidth}
+			\centering
+			\includegraphics[width=\textwidth]{"No filtering.png"}
+			\caption{ED}
+		\end{minipage}
+		\caption{Dragon Balls prior to Circle Filtering}
+	\end{figure}
+	
+	We can see on right figure above that many circles intersect, but after filtering, on the right figure below, there are no extra circles. Although on the right figure below, there is a problem of overdetecting radius, which can be explained by "shining" of the balls in the top left corner, as pixels in those areas tend to "stretch" clusters more. Also, note how for balls of this size(the image is huge, compared to others: $2560 \times 2477$) there are clusters somewhat horizontally, but this is not an issue, since different circles in the same cluster get detected nonetheless.
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=\textwidth]{"Filtering.png"}
+		\caption{Dragon Balls with Circle Filtering}
+	\end{figure} 
+	
+	\newpage
+	\subsection*{Ball Motion ODEs}
+	
+	The motion of a ball can be described by the following ordinary differential equations:	
+	\begin{align}
+		\frac{dx}{dt} &= v_x, \quad \frac{dy}{dt} = v_y, \\
+		\frac{dv_x}{dt} &= -\frac{k}{m} v_x \sqrt{v_x^2 + v_y^2}, \\
+		\frac{dv_y}{dt} &= -g - \frac{k}{m} v_y \sqrt{v_x^2 + v_y^2}.
+	\end{align}
+	
+	The initial value conditions are given by:
+	\begin{align*}
+		x(0) = x_0, \quad y(0) = y_0, \\
+		v_x(0) = v_{x_0}, \quad v_y(0) = v_{y_0}.
+	\end{align*}
+	
+	This system of differential equations and initial value conditions must be  transformed into a boundary value problem, which should then be solved using the shooting method. In the current initial value conditions, $x(0) = x_0$ and $y(0) = y_0$ represent the position of the shooter from which the ball will be launched. What I need to do is add $x(b_x) = x_r$ and $y(b_y) = y_r$, which correspond to the position of the target I am aiming at. Even though there may be many targets in the input image, I am shooting at them one by one, so I do not need to solve the BVP for all balls simultaneously.
+	
+	\textit{Shooter1vN} class will be responsible for the entire simulation. \textit{get$\_$edge$\_$points} method will now become static method of this class. Constructor of this class:
+	
+\begin{lstlisting}[language=python]
+class Shooter1vN:
+	def __init__(self, img_path, seed=95):
+		self.img = np.array(Image.open(img_path))
+		if self.img is None:
+			raise ValueError(f"Could not load image from path: {img_path}")
+		(self.shooter_position, self.shooter_radius), (self.centers, self.radii) = self.setup(self.img, seed)
+		# For output
+		self.shooter = MainGuy(800, 600)
+		self.setup_simulation()
+\end{lstlisting}
+
+	Some things I want to make clear:
+	\begin{enumerate}
+		\item[$\lightning$] I have added \textit{seed=95} so that shooter's position is randomized among possible positions, but seed value makes the test reproducible. 95 in honor of Lightning McQueen $\lightning$.
+		\item[$\boxast$] I raise error if invalid image path is used for creating instance of \textit{Shooter1vN}. Happens to me all the time.
+		\item[$\varogreaterthan$] \textit{MainGuy} is the class that will be used for simulation. $800 \times 600$ video will be created for the simulation that is set up on the next line.
+	\end{enumerate}
+
+\begin{lstlisting}[language=python]
+def setup(self, img, seed=95, shooter_size=15):
+	random.seed(seed)
+	np.random.seed(seed)
+	
+	edge_points = self.get_edge_points(img)
+	dbscan = DBSCAN(eps=5, min_pts=25)
+	dbscan.dbscan(edge_points)
+	centers = dbscan.cluster_centers_
+	radii = dbscan.cluster_radii_
+	
+	def is_valid_position(candidate, centers, r, min_distance=5):
+		for center, radius in zip(centers, r):
+			distance = np.linalg.norm(candidate - center)
+			if distance < radius + shooter_size + 2 or distance < min_distance:
+				return False
+			return True
+	
+	img_shape = np.array(img).shape[:2]
+	while True:
+		candidate = np.random.uniform(low=[0, 0], high=img_shape)
+		if is_valid_position(candidate, centers, radii):
+			break
+	
+	return (candidate, shooter_size), (centers, radii)
+\end{lstlisting}
+	
+	The \textit{setup} method initializes a shooting position within an image by first setting a random seed for reproducibility. It retrieves edge points from the image using now static method of this class - \textit{get$\_$edge$\_$points} and applies \textit{DBSCAN} to identify cluster centers and their radii. A nested function checks if a randomly generated candidate position is valid by ensuring it maintains a safe distance from the cluster centers, considering the shooter size and a minimum distance. The method continues generating random positions until it finds one that meets these criteria and returns the valid candidate position along with the cluster centers and their radii.
+	
+\begin{lstlisting}[language=python]
+   def current_state(self):
+	img_copy = cv2.cvtColor(np.array(self.img.copy()), cv2.COLOR_BGR2RGB)
+	
+	for center, radius in zip(self.centers, self.radii):
+		cv2.circle(img_copy,(int(center[1]), int(center[0])),  # Swap x and y for OpenCV's coordinate system
+			int(radius),(255, 0, 0),2
+		)
+	
+	cv2.circle(img_copy, (int(self.shooter_position[1]), int(self.shooter_position[0])), 
+		int(self.shooter_radius),(0, 255, 0), -1  # Filled circle
+	)
+	
+	plt.figure(figsize=(8, 8))
+	plt.imshow(img_copy)
+	plt.axis('off')
+	plt.title("Current State")
+	plt.show()
+\end{lstlisting}
+
+	The \textit{current$\_$state} method visualizes the current state of the image. It iterates through the identified cluster centers and their radii, drawing red circles around each cluster on the image. Then, it draws a filled green circle at the shooter's position, representing the shooter. Finally, the method displays the modified image. This function will only be used for testing purposes, as simulation will be entirely based on \textbf{raylib}'s python version: \textbf{pyray}.
+	
+\begin{lstlisting}[language=python]
+def setup_simulation(self):
+	self.shooter.set_shooter((self.shooter_position[1], self.shooter_position[0]), self.shooter_radius)
+	for center, radius in zip(self.centers, self.radii):
+		self.shooter.add_target(center[1], center[0], radius)
+
+
+def run_simulation(self):
+	self.shooter.simulate()
+\end{lstlisting}
+	
+	Both of the methods above heavily depend upon \textit{MainGuy} class, which will be explained later on. The \textit{setup$\_$simulation} method prepares the simulation by configuring the shooter with its position and radius, ensuring it is set up correctly for the simulation environment. It then iterates through the identified cluster centers and their corresponding radii, adding each target to the shooter. The \textit{run$\_$simulation} method subsequently executes the simulation by calling the \textit{simulate} function of the shooter, processes the shooting mechanics and interactions with the targets. Together, these methods establish the necessary parameters and initiate the simulation of the shooting scenario.
+	
+	\subsection*{MainGuy Pre-Requisites}
+	
+	\textit{MainGuy} class uses \textit{Ball} and \text{PhysicsParams} classes, along with methods for calculating accelaration, RK4 and the shooting method.
+	
+	 
+\begin{lstlisting}[language=python]
+class Ball:
+	def __init__(self, x: float, y: float, vx: float, vy: float, radius: float = 5.0):
+		self.x = x
+		self.y = y
+		self.vx = vx
+		self.vy = vy
+		self.radius = radius
+		self.active = True
+	
+	def get_state(self) -> np.ndarray:
+		return np.array([self.x, self.y, self.vx, self.vy])
+	
+	def set_state(self, state: np.ndarray):
+		self.x, self.y, self.vx, self.vy = state
+\end{lstlisting}
+	
+	\textit{Ball} class represents a moving ball in the simulation. It stores the ball's position $(x, y)$, velocity $(v_x, v_y)$, and radius, with default values provided for the radius. The active attribute indicates if the ball is still in play. The class also includes \textit{get$\_$state} and \textit{set$\_$state} methods to retrieve and update the ball's state as a NumPy array, which will be useful for numerical simulations.
+	
+	
+\begin{lstlisting}[language=python]
+@dataclass
+class PhysicsParams:
+	phi: float = 0.0005  # Air resistance coefficient
+	g: float = 100.0  # Gravity
+	dt: float = 0.01  # Time step
+	time_steps: int = 200  # Number of simulation steps
+	h: float = 0.001  # Step size for shooting method
+\end{lstlisting}
+
+\textit{\MVAt dataclass} decorator for \textit{PhysicsParams} class automatically generates common methods like \textit{$\_\_$init$\_\_$}, \textit{$\_\_$repr$\_\_$}, and \textit{$\_\_$eq$\_\_$}, simplifying the creation of classes intended to store data.
+
+In this class, \textit{phi} ($\varphi$) is equivalent to $\frac{k}{m}$.
+
+	\subsubsection*{Helper Methods}
+\begin{lstlisting}[language=python]
+def acceleration(v: Tuple[float, float], params: PhysicsParams) -> Tuple[float, float]:
+	vx, vy = v
+	mag = np.sqrt(vx * vx + vy * vy)
+	return (-params.phi * vx * mag, params.g - params.phi * vy * mag)
+
+def derivative_vector(state: np.ndarray, params: PhysicsParams) -> np.ndarray:
+	x, y, vx, vy = state
+	ax, ay = acceleration((vx, vy), params)
+	return np.array([vx, vy, ax, ay])
+
+def rk4_step(ball: Ball, params: PhysicsParams) -> None:
+	state = ball.get_state()
+	k1 = derivative_vector(state, params)
+	k2 = derivative_vector(state + 0.5 * params.dt * k1, params)
+	k3 = derivative_vector(state + 0.5 * params.dt * k2, params)
+	k4 = derivative_vector(state + params.dt * k3, params)
+
+	new_state = state + (params.dt/6.0) * (k1 + 2*k2 + 2*k3 + k4)
+	ball.set_state(new_state)
+\end{lstlisting}	
+	
+	I will need acceleration of the ball in both directions for the output video.
+	\begin{align*}
+		a_x = \frac{d v_x}{dt} = -\frac{k}{m} v_x \sqrt{v_x^2 + v_y^2}, \\
+		a_y = \frac{d v_y}{dt} = -g - \frac{k}{m} v_y \sqrt{v_x^2 + v_y^2}.
+	\end{align*} 
+	
+	REMINDER: In the code \textit{phi} ($\varphi$) is equivalent to $\frac{k}{m}$.
+	
+	Derivative vector for all the functions give by ODEs is:
+	
+	\begin{equation}
+		\frac{d}{dt} 
+		\begin{bmatrix}
+			x \\ y \\ v_x \\ v_y
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			v_x \\
+			v_y \\
+			-\frac{k}{m} v_x \sqrt{v_x^2 + v_y^2} \\
+			-g - \frac{k}{m} v_y \sqrt{v_x^2 + v_y^2}
+		\end{bmatrix}.
+	\end{equation}
+	
+	Moving on with RK4 method, let $\mathbf{y} = [x, y, v_x, v_y]$, the RK4 method calculates:
+	\begin{align*}
+		k_1 &= f(t, \mathbf{y}), \\
+		k_2 &= f\left(t + \frac{\Delta t}{2}, \mathbf{y} + \frac{\Delta t}{2} k_1\right), \\
+		k_3 &= f\left(t + \frac{\Delta t}{2}, \mathbf{y} + \frac{\Delta t}{2} k_2\right), \\
+		k_4 &= f\left(t + \Delta t, \mathbf{y} + \Delta t \cdot k_3\right).
+	\end{align*}
+	
+	The next state is computed by:
+	
+	\begin{equation}
+		\mathbf{y}_{\text{next}} = \mathbf{y} + \frac{\Delta t}{6} (k_1 + 2k_2 + 2k_3 + k_4).
+	\end{equation}
+	
+	This method accurately integrates the ball's motion considering drag and gravity described by $(1), (2)$ and $(3)$. \\
+	
+	Let's also add Heun's RK2 for comparison later on:
+	
+\begin{lstlisting}[language=python]
+def heun_rk2_step(ball: Ball, params: PhysicsParams) -> None:
+	state = ball.get_state()
+	
+	# Predictor step (Euler's method)
+	k1 = derivative_vector(state, params)
+	predictor = state + params.dt * k1
+	
+	# Corrector step (average slope)
+	k2 = derivative_vector(predictor, params)
+	
+	# Update state
+	new_state = state + (params.dt / 2.0) * (k1 + k2)
+	ball.set_state(new_state)
+\end{lstlisting}	
+
+	\subsubsection*{Precision and $A$-Stability}
+
+	RK4 is $O(\triangle t^4)$, while Heun's RK2 is $O(\triangle t^2)$, but as testing will show, there is no visual difference, which might be because of the "low" accuracy needed for this task as well as size of the balls influencing the precision. According to \cite{Astab}, for $\triangle t \leq \min (\frac{2m}{k}, \frac{2.785m}{k}) = \frac{2m}{k}$ both Heun's RK2 and RK4 are conditionally $A$-stable. $dt = 1$ does more than a fine job of respecting this upper bound. \\
+
+	Now comes the main method, THE Shooting Method: \\
+	
+	\textit{shooting$\_$method} computes the optimal initial velocities $(v_{x_0}, v_{y_0})$ for a ball to hit a specified target. I used Newton-Raphson method, instead of bisection method, in two dimensions to adjust the initial velocities, minimizing the difference between the ball's simulated final position and the target. \\
+	
+	The goal is to solve for initial velocities $(v_{x_0}, v_{y_0})$ such that the ball's trajectory $(x(t),y(t))$ reaches the target at $(x_r, y_r)$.
+	\begin{align*}
+		\begin{cases}
+			F_1(v_{x_0}, v_{y_0}) = x(v_{x_0}, v_{y_0}) - x_r = 0, \\
+			F_2(v_{x_0}, v_{y_0}) = y(v_{x_0}, v_{y_0}) - y_r = 0.
+		\end{cases}
+	\end{align*}
+	
+	Using Newton-Raphson iteration for systems of equations, the update rule for the initial velocities is:
+	\begin{equation*}
+		\begin{bmatrix}
+			v_{x_0} \\
+			v_{y_0}
+		\end{bmatrix}
+		:=
+		\begin{bmatrix}
+			v_{x_0} \\
+			v_{y_0}
+		\end{bmatrix}
+		- J^{-1}
+		\begin{bmatrix}
+			F_1 \\
+			F_2
+		\end{bmatrix},
+	\end{equation*}
+	
+	where $J$ is the Jacobian matrix of partial derivatives:
+	
+	\begin{equation}
+		J =
+		\begin{bmatrix}
+			\dfrac{\partial F_1}{\partial v_{x_0}} & \dfrac{\partial F_1}{\partial v_{y_0}} \\
+			\dfrac{\partial F_2}{\partial v_{x_0}} & \dfrac{\partial F_2}{\partial v_{y_0}}
+		\end{bmatrix}
+		=
+		\begin{bmatrix}
+			\dfrac{\partial x}{\partial v_{x_0}} & \dfrac{\partial x}{\partial v_{y0}} \\
+			\dfrac{\partial y}{\partial v_{x_0}} & \dfrac{\partial y}{\partial v_{y0}}
+		\end{bmatrix}.
+	\end{equation}
+	
+	Which I will approximate using finite differences:
+	\begin{align*}
+		\dfrac{\partial x}{\partial v_{x_0}} &\approx \dfrac{x_1 - x}{h}, &
+		\dfrac{\partial x}{\partial v_{y_0}} &\approx \dfrac{x_2 - x}{h}, \\
+		\dfrac{\partial y}{\partial v_{x_0}} &\approx \dfrac{y_1 - y}{h}, &
+		\dfrac{\partial y}{\partial v_{y_0}} &\approx \dfrac{y_2 - y}{h},
+	\end{align*}
+	
+	where $x_1, y_1$ and $x_2, y_2$ are the positions after slightly increasing $v_{x_0}$ and $v_{y_0}$ by $h$.
+	
+	Given $\text{det}(J) = j_{11} j_{22} - j_{12} j_{21}$, the Newton-Raphson update for the velocities is:
+	\begin{align*}
+		\Delta v_{x_0} &= \dfrac{j_{22} \cdot e_1 - j_{12} \cdot e_2}{\text{det}(J)}, \\
+		\Delta v_{y_0} &= \dfrac{-j_{21} \cdot e_1 + j_{11} \cdot e_2}{\text{det}(J)},
+	\end{align*}
+	
+	where the errors are:
+	\begin{align*}
+		e_1 &= x_r - x, \\
+		e_2 &= y_r - y.
+	\end{align*}
+	
+	New velocities will be calculated as:
+	\begin{align*}
+		v_{x_0} := v_{x_0} + \Delta v_{x_0}, \\
+		v_{y_0} := v_{y_0} + \Delta v_{y_0}.
+	\end{align*}
+	
+	This iterative process continues until the errors are sufficiently small (criterion in code: $\text{det}(J) < 10^{-5}$) or the maximum number of iterations is reached.
+
+	\newpage
+	\subsection*{MainGuy}
+\begin{lstlisting}[language=python]
+class MainGuy:
+	def __init__(self, width: int = 800, height: int = 600):
+		self.width = width
+		self.height = height
+		self.params = PhysicsParams()
+		self.current_ball: Optional[Ball] = None
+		self.targets: List[Tuple[float, float, float]] = []  # x, y, radius
+		self.active_targets: List[bool] = []  # Track which targets are still active
+		self.shooter_pos = (0, 0)
+		self.shooter_radius = 0
+		self.current_target_index = 0
+		self.shot_fired = False
+	
+	def set_shooter(self, pos: Tuple[float, float], radius: float):
+		self.shooter_pos = pos
+		self.shooter_radius = radius
+	
+	def add_target(self, x: float, y: float, radius: float):
+		self.targets.append((x, y, radius))
+		self.active_targets.append(True)
+\end{lstlisting}	
+	
+	I believe most of the attributes of the constructor, \textit{set$\_$shooter}  and \textit{add$\_$target} methods are self-explanatory, except for these attributes in the constructor that might need explanation:  \textit{active$\_$targets} list mirrors the targets list, keeps track of whether each target is still "alive" or has been hit and \textit{shot$\_$fired} flag indicates whether a ball is currently in motion, ensuring no unnecessary actions take place during simulation. 
+	
+\begin{lstlisting}[language=python]
+def check_collision(self) -> bool:
+	if not self.current_ball or not self.current_ball.active:
+		return False
+	
+	target = self.targets[self.current_ball.target_index]
+	if not self.active_targets[self.current_ball.target_index]:
+		return False
+	
+	dx = self.current_ball.x - target[0]
+	dy = self.current_ball.y - target[1]
+	distance = np.sqrt(dx * dx + dy * dy)
+	
+	return distance < (self.current_ball.radius + target[2])
+\end{lstlisting}
+
+\textit{check$\_$collision} method determines whether the current ball has hit its target. It first checks if a ball is active and in motion. If not, it returns \textbf{False}, avoiding unnecessary calculations. 
+The method then retrieves the target associated with the ball’s \textit{target$\_$index}. If this target is inactive, the method again returns \textbf{False}.
+If both the ball and target are valid, the method calculates the Euclidean distance between the ball's center and the target's center using: $\text{distance} = \sqrt{(dx)^2 + (dy)^2}$
+A collision is detected if this distance is less than the sum of the ball’s and target’s radii. If so, the method returns \textbf{True}; otherwise, it returns \textbf{False}.
+
+\begin{lstlisting}[language=python]
+def shoot_next_ball(self) -> bool:
+	active_targets = [(i, t) for i, t in enumerate(self.targets) if self.active_targets[i]]
+	if not active_targets:
+		return False
+	
+	active_targets.sort(key=lambda t: np.hypot(t[1][0] - self.shooter_pos[0], t[1][1] - self.shooter_pos[1]))
+	closest_index, target = active_targets[0]
+	vx, vy = shooting_method(self.shooter_pos[0], self.shooter_pos[1], target[0], target[1], self.params)
+	
+	self.current_ball = Ball(self.shooter_pos[0], self.shooter_pos[1], vx, vy)
+	self.current_ball.target_index = closest_index
+	self.shot_fired = True
+	return True
+\end{lstlisting}
+
+\textit{shoot$\_$next$\_$ball} method is responsible for firing the next ball towards the closest active target. First, it identifies all active targets by filtering through the \textit{targets} list and checking corresponding entries in \textit{active$\_$targets}. If no targets remain, the method returns \textit{False}, signaling there are no more balls to shoot.
+
+The active targets are then sorted based on their distance from the shooter’s position. This is calculated using the Euclidean distance formula. The closest target is selected, and its index and coordinates are stored.
+
+Next, the \textit{shooting$\_$method} function is invoked to compute the initial velocity $(v_x, v_y$ needed for the ball to hit the target. This method iteratively adjusts the velocities using a numerical approach to minimize errors in the ball's trajectory.
+
+A new \textit{Ball} object is created at the shooter’s position, initialized with the computed velocity. The ball is associated with the selected target via its \textit{target$\_$index}. The method sets the \textit{shot$\_$fired} flag to \textbf{True} and returns \textbf{True}, indicating the ball has been successfully fired. This method combines dynamic target selection with precise trajectory calculation to ensure accurate shooting. \\
+
+Finally, \textit{simulate} method puts together the visual and interactive simulation of the entire system. Within each frame, the method draws the active targets in red and the shooter in green, providing visual context for the game. If no ball has been fired yet, \textit{shoot$\_$next$\_$ball} is called to initiate a shot. If there are no remaining targets, the simulation exits gracefully.
+
+Once a ball is active, its position and velocity are updated using the Runge-Kutta method (\textit{rk4$\_$step} or \textit{heun$\_$rk2$\_$step}), which simulates realistic physics, including gravity and air resistance. The ball is drawn in blue as it moves, providing real-time feedback on its trajectory.
+
+Collisions between the ball and targets are checked using \textit{check$\_$collision}. If a collision is detected, the target is deactivated, and the ball is removed. If the ball exits the screen bounds, it is also deactivated. The process then repeats, preparing for the next shot.
+
+\newpage
+\begin{lstlisting}[language=python]
+def simulate(self):
+	init_window(self.width, self.height, "THE MainGuy Simulation")
+	set_target_fps(60)
+	
+	while not window_should_close():
+		begin_drawing()
+		clear_background(WHITE)
+		
+		for i, (tx, ty, tr) in enumerate(self.targets):
+			if self.active_targets[i]:
+				draw_circle(int(tx), int(ty), tr, RED)
+		
+		draw_circle(int(self.shooter_pos[0]), int(self.shooter_pos[1]), self.shooter_radius, GREEN)
+		
+		if not self.shot_fired:
+			if not self.shoot_next_ball():
+				if self.current_target_index >= len(self.targets):
+					break
+		elif self.current_ball and self.current_ball.active:
+			rk4_step(self.current_ball, self.params)
+			draw_circle(int(self.current_ball.x), int(self.current_ball.y), self.current_ball.radius, BLUE)
+			
+			if self.check_collision():
+				self.active_targets[self.current_ball.target_index] = False
+				self.current_ball.active = False
+				self.shot_fired = False
+				self.current_target_index += 1
+				
+			if (self.current_ball.x < 0 or self.current_ball.x > self.width or
+				self.current_ball.y < 0 or self.current_ball.y > self.height):
+				self.current_ball.active = False
+				self.shot_fired = False
+			
+		end_drawing()
+	close_window()
+\end{lstlisting}
+
+	I tested with \textit{heun$\_$rk2$\_$step} as solver, for all the images I provided as tests, but no visual results were visible.
+\begin{figure}[H]
+	\centering
+	\includegraphics[width=0.47\textwidth, height=0.19\textheight]{"Output 1.png"}
+	\caption{A single frame from the output video}
+\end{figure}
+	
+	\section*{When does the code fail?}
+	
+	The code obviously fails with images that contain shadows and/or edges other than the ball, as it will probably see them as a "normal" edge and fail to remove it. This may be avoidable with more advanced techniques, such as background subtraction. More optimized and sophisticated implementations of edge detection will also probably do a better job.
+	
+	Another case, where this code fails, is when balls are not entirely in the image and only part of them are visible:
+	
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.4\textwidth, height=0.25\textheight]{"Image to Fail.png"}
+		\caption{Image destined to fail on the code}
+	\end{figure}
+
+	If you look at the top corners of the edge detected image below, you can see part of the red circle, meaning this code clustered all balls as one ball. As such, simulation will show only a single big ball and end instantly.
+
+	\begin{figure}[H]
+		\centering
+		\includegraphics[width=0.4\textwidth, height=0.25\textheight]{"Failed.png"}
+		\caption{Mis-clustering of the balls}
+	\end{figure}
+
+	\begin{thebibliography}{1}	
+		\bibitem{Astab}
+		Lado Turmanidze,
+		\textit{Stability Wars: A-Stability in ODEs},
+		2025.
+	\end{thebibliography}
+		
+	
+\end{document}
